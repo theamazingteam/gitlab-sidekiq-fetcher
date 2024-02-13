@@ -23,7 +23,12 @@ jobs:
 
       - name: Sparse checkout from GitLab and prepare changes
         run: |
-          # Your steps to fetch and prepare changes from GitLab go here
+          git remote add gitlab https://gitlab.com/gitlab-org/gitlab.git || true
+          git config core.sparseCheckout true
+          echo "vendor/gems/sidekiq-reliable-fetch" > .git/info/sparse-checkout
+          git fetch gitlab master --depth=1
+          git checkout FETCH_HEAD
+          git reset --soft HEAD@{1}
 
       - name: Exclude .github directory and commit changes
         run: |
