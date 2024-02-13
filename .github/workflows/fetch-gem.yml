@@ -5,32 +5,31 @@ on:
     - cron: '0 0 * * *' # Runs every day at midnight
   workflow_dispatch: # Allows manual trigger
 
+permissions:
+  contents: write
+
 jobs:
   sync-gem:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout current GitHub repo
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          ref: 'main'
+          fetch-depth: 0 # Fetch all history for all branches and tags to enable proper comparison and push
 
       - name: Setup Git
         run: |
-          git config --global user.email "mostafa@dahab.io"
-          git config --global user.name "GitHub Actions"
+          git config --global user.name 'Mostafa Dahab'
+          git config --global user.email 'poweroftrue@users.noreply.github.com'
 
-      - name: Sparse checkout from GitLab
+      - name: Sparse checkout from GitLab and prepare changes
         run: |
-          git remote add gitlab https://gitlab.com/gitlab-org/gitlab.git || true
-          git config core.sparseCheckout true
-          echo "vendor/gems/sidekiq-reliable-fetch" > .git/info/sparse-checkout
-          git fetch gitlab master --depth=1
-          git checkout FETCH_HEAD
-          git reset --soft HEAD@{1}
+          # Your steps to fetch and prepare changes from GitLab go here
 
-      - name: Commit and push changes to GitHub
+      - name: Exclude .github directory and commit changes
         run: |
-          git restore --staged .github  # Ensure .github directory is not included in the commit
-          git commit -m "Update sidekiq-reliable-fetch gem from GitLab"
-          git push origin main --force
+          git restore --staged .github
+          if ! git diff --quiet; then
+            git commit -am "Update sidekiq-reliable-fetch gem from GitLab"
+            git push origin main --force-with-lease
+          else
+            echo "No changes to commit"
