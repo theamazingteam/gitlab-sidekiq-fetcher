@@ -27,9 +27,9 @@ jobs:
 
       - name: Exclude .github directory and commit changes
         run: |
-          git restore --staged .github
-          if ! git diff --quiet; then
-            git commit -am "Update sidekiq-reliable-fetch gem from GitLab"
-            git push origin main --force-with-lease
-          else
+          git restore --staged .github || echo ".github directory not changed"
+          if git diff --staged --quiet; then
             echo "No changes to commit"
+          else
+            git commit -m "Update sidekiq-reliable-fetch gem from GitLab"
+            git push origin main --force-with-lease
