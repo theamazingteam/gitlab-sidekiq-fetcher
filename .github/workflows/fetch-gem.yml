@@ -17,7 +17,7 @@ jobs:
 
       - name: Setup Git
         run: |
-          git config --global user.email "you@example.com"
+          git config --global user.email "mostafa@dahab.io"
           git config --global user.name "GitHub Actions"
 
       - name: Sparse checkout from GitLab
@@ -33,4 +33,4 @@ jobs:
         run: |
           git restore --staged .github  # Ensure .github directory is not included in the commit
           git commit -m "Update sidekiq-reliable-fetch gem from GitLab"
-          git push origin main --force-with-lease
+          git push origin main --force
