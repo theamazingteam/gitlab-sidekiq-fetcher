@@ -6,33 +6,31 @@ on:
   workflow_dispatch: # Allows manual trigger
 
 jobs:
-  update-gem:
+  sync-gem:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout current repo
+      - name: Checkout current GitHub repo
         uses: actions/checkout@v2
         with:
-          ref: 'main' # Ensure we're on the correct branch
+          ref: 'main'
 
       - name: Setup Git
         run: |
           git config --global user.email "you@example.com"
-          git config --global user.name "Your Name"
+          git config --global user.name "GitHub Actions"
 
-      - name: Sparse checkout and update gem
+      - name: Sparse checkout from GitLab
         run: |
-          git remote add upstream https://gitlab.com/gitlab-org/gitlab.git || true
+          git remote add gitlab https://gitlab.com/gitlab-org/gitlab.git || true
           git config core.sparseCheckout true
           echo "vendor/gems/sidekiq-reliable-fetch" > .git/info/sparse-checkout
-          git fetch --depth=1 upstream master # Fetch from GitLab master
-          git reset --hard FETCH_HEAD
-          git clean -df
+          git fetch gitlab master --depth=1
+          git checkout FETCH_HEAD
+          git reset --soft HEAD@{1}
 
-      - name: Commit changes
+      - name: Commit and push changes to GitHub
         run: |
-          git add -A
-          git diff-index --quiet HEAD || git commit -m "Update sidekiq-reliable-fetch gem"
-
-      - name: Force push changes to main
-        run: git push origin main --force
+          git restore --staged .github  # Ensure .github directory is not included in the commit
+          git commit -m "Update sidekiq-reliable-fetch gem from GitLab"
+          git push origin main --force-with-lease
