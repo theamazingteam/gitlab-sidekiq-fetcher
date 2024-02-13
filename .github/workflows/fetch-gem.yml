@@ -35,8 +35,8 @@ jobs:
 
       - name: Copy sidekiq-reliable-fetch to local repository
         run: |
-          cd $GITHUB_WORKSPACE
-          cp -R $TEMP_DIR/gitlab/vendor/gems/sidekiq-reliable-fetch/* .
+          cd ${{ github.workspace }}
+          cp -R $TEMP_DIR/gitlab/vendor/gems/sidekiq-reliable-fetch/* ${{ github.workspace }}
 
       - name: Commit and push changes
         run: |
