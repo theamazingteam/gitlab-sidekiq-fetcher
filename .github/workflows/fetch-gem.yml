@@ -1,0 +1,28 @@
+name: Fetch Sidekiq Reliable Fetch Gem
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs every day at midnight
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  update-gem:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v2
+
+
+      - name: Sparse checkout and update gem
+        run: |
+          git remote add upstream https://gitlab.com/gitlab-org/gitlab.git
+          git config core.sparseCheckout true
+          echo "vendor/gems/sidekiq-reliable-fetch" > .git/info/sparse-checkout
+          git pull --depth=1 upstream master
+
+      - name: Commit changes
+        run: |
+          git add -A
+          git commit -m "Update sidekiq-reliable-fetch gem" || echo "No changes to commit"
+          git push
