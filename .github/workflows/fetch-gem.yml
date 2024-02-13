@@ -16,11 +16,6 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for all branches and tags to enable proper comparison and push
 
-      - name: Setup Git
-        run: |
-          git config --global user.name 'Mostafa Dahab'
-          git config --global user.email 'poweroftrue@users.noreply.github.com'
-
       - name: Sparse checkout from GitLab and prepare changes
         run: |
           git remote add gitlab https://gitlab.com/gitlab-org/gitlab.git || true
@@ -33,5 +28,7 @@ jobs:
       - name: Exclude .github directory and commit changes
         run: |
           git restore --staged .github || echo ".github directory not changed"
-          git commit -m "Update sidekiq-reliable-fetch gem from GitLab"
-          git push origin main --force-with-lease
+          git config --global user.name 'Mostafa Dahab'
+          git config --global user.email 'poweroftrue@users.noreply.github.com'
+          git commit -am "Automated report"
+          git push 
