@@ -16,27 +16,32 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for all branches and tags
 
+      - name: Setup directories
+        run: |
+          mkdir -p ./vendor/gems/sidekiq-reliable-fetch
+          echo "Local directory for sidekiq-reliable-fetch is ready."
+
       - name: Setup temporary directory
         run: |
-          mkdir -p ${{ runner.temp }}/vendor
-          echo "Temp directory for vendor: ${{ runner.temp }}/vendor"
+          TEMP_DIR=$(mktemp -d)
+          echo "TEMP_DIR=${TEMP_DIR}" >> $GITHUB_ENV
 
       - name: Fetch vendor directory from GitLab
         run: |
-          git clone --depth 1 --filter=blob:none --sparse https://gitlab.com/gitlab-org/gitlab.git ${{ runner.temp }}/gitlab
-          cd ${{ runner.temp }}/gitlab
-          git sparse-checkout add vendor/gems/sidekiq-reliable-fetch
+          git clone --depth 1 --filter=blob:none --sparse https://gitlab.com/gitlab-org/gitlab.git $TEMP_DIR/gitlab
+          cd $TEMP_DIR/gitlab
+          git sparse-checkout set vendor/gems/sidekiq-reliable-fetch
           git checkout master
 
       - name: Copy sidekiq-reliable-fetch to local repository
         run: |
-          cp -R ${{ runner.temp }}/gitlab/vendor/gems/sidekiq-reliable-fetch/* .
+          cd $GITHUB_WORKSPACE
+          cp -R $TEMP_DIR/gitlab/vendor/gems/sidekiq-reliable-fetch/* .
 
       - name: Commit and push changes
         run: |
-          git config --global user.name 'Your Name'
-          git config --global user.email 'youremail@example.com'
+          git config --global user.name 'Mostafa Dahab'
+          git config --global user.email 'poweroftrue@users.noreply.github.com'
           git add vendor/gems/sidekiq-reliable-fetch/
-          git status
-          git commit -m "Update sidekiq-reliable-fetch gem" || echo "No changes to commit"
+          git diff --staged --quiet || git commit -m "Update sidekiq-reliable-fetch gem"
           git push origin HEAD:main --force
