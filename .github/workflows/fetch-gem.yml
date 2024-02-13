@@ -12,23 +12,27 @@ jobs:
     steps:
       - name: Checkout current repo
         uses: actions/checkout@v2
+        with:
+          ref: 'main' # Ensure we're on the correct branch
 
       - name: Setup Git
         run: |
-          git config --global user.email "mostafa@dahab.io"
-          git config --global user.name "Mostafa Dahab"
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
 
       - name: Sparse checkout and update gem
         run: |
           git remote add upstream https://gitlab.com/gitlab-org/gitlab.git || true
           git config core.sparseCheckout true
           echo "vendor/gems/sidekiq-reliable-fetch" > .git/info/sparse-checkout
-          git fetch --depth=1 upstream main
-          git reset --hard upstream/main
+          git fetch --depth=1 upstream master # Fetch from GitLab master
+          git reset --hard FETCH_HEAD
           git clean -df
 
       - name: Commit changes
         run: |
           git add -A
-          git commit -m "Update sidekiq-reliable-fetch gem" || echo "No changes to commit"
-          git push
+          git diff-index --quiet HEAD || git commit -m "Update sidekiq-reliable-fetch gem"
+
+      - name: Force push changes to main
+        run: git push origin main --force
