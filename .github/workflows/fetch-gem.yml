@@ -32,6 +32,7 @@ jobs:
           cd $TEMP_DIR/gitlab
           git sparse-checkout set vendor/gems/sidekiq-reliable-fetch
           git checkout master
+          ls -l 
 
       - name: Copy sidekiq-reliable-fetch to local repository
         run: |
