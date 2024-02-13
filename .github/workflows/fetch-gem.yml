@@ -23,8 +23,8 @@ jobs:
           git remote add upstream https://gitlab.com/gitlab-org/gitlab.git || true
           git config core.sparseCheckout true
           echo "vendor/gems/sidekiq-reliable-fetch" > .git/info/sparse-checkout
-          git fetch --depth=1 upstream master
-          git reset --hard upstream/master
+          git fetch --depth=1 upstream main
+          git reset --hard upstream/main
           git clean -df
 
       - name: Commit changes
