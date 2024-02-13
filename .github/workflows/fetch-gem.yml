@@ -13,6 +13,10 @@ jobs:
       - name: Checkout current repo
         uses: actions/checkout@v2
 
+      - name: Setup Git
+        run: |
+          git config --global user.email "mostafa@dahab.io"
+          git config --global user.name "Mostafa Dahab"
 
       - name: Sparse checkout and update gem
         run: |
