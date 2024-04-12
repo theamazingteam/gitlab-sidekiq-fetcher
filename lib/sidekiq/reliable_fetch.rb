@@ -22,8 +22,7 @@ module Sidekiq
 
       queues_list.each do |queue|
         work = Sidekiq.redis do |conn|
-          # Updated to use LMOVE as RPOPLPUSH is deprecated
-          conn.lmove(queue, self.class.working_queue_name(queue), 'RIGHT', 'LEFT')
+          conn.rpoplpush(queue, self.class.working_queue_name(queue))
         end
 
         return UnitOfWork.new(queue, work) if work
