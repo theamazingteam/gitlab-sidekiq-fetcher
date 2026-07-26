@@ -3,6 +3,7 @@ require 'fetch_shared_examples'
 require 'sidekiq/base_reliable_fetch'
 require 'sidekiq/reliable_fetch'
 require 'sidekiq/semi_reliable_fetch'
+require 'sidekiq/interruptions_exhausted'
 require 'sidekiq/capsule'
 
 describe Sidekiq::BaseReliableFetch do
@@ -72,6 +73,8 @@ describe Sidekiq::BaseReliableFetch do
     end
 
     it 'puts jobs into interrupted queue' do
+      stub_const 'Bob', Class.new
+
       uow = described_class::UnitOfWork
       interrupted_job = Sidekiq.dump_json(class: 'Bob', args: [1, 2, 'foo'], interrupted_count: 3)
       jobs = [ uow.new('queue:foo', interrupted_job), uow.new('queue:foo', job), uow.new('queue:bar', job) ]
@@ -80,6 +83,77 @@ describe Sidekiq::BaseReliableFetch do
       expect(queue1.size).to eq 1
       expect(queue2.size).to eq 1
       expect(Sidekiq::InterruptedSet.new.size).to eq 1
+    end
+
+    context 'when sidekiq_interruption_exhausted callback is defined' do
+      before do
+        stub_const 'Bob', Class.new
+
+        Bob.class_eval do
+          include Sidekiq::InterruptionsExhausted
+
+          sidekiq_interruptions_exhausted do |msg|
+            self.handle_interruptions_exhausted(msg)
+          end
+
+          # mock method to test interruptions exhausted behavior
+          def self.handle_interruptions_exhausted(msg); end
+        end
+      end
+
+      it 'calls sidekiq_interruption_exhausted callback and sends job to the InterruptedSet' do
+        expect(Bob).to receive(:handle_interruptions_exhausted).with(
+          { 'args' => [1, 2, 'foo'], 'class' => 'Bob', 'interrupted_count' => 4 }
+        )
+
+        uow = described_class::UnitOfWork
+        interrupted_job = Sidekiq.dump_json(class: 'Bob', args: [1, 2, 'foo'], interrupted_count: 3)
+        jobs = [uow.new('queue:foo', interrupted_job), uow.new('queue:foo', job), uow.new('queue:bar', job)]
+        described_class.new(capsule).bulk_requeue(jobs)
+
+        expect(queue1.size).to eq 1
+        expect(queue2.size).to eq 1
+        expect(Sidekiq::InterruptedSet.new.size).to eq 1
+      end
+
+      context 'when an exception is raised during the excecution of the sidekiq_interruptions_exhausted callback' do
+        it 'logs the error and still sends job to the InterruptedSet' do
+          expect(Bob).to receive(:handle_interruptions_exhausted).and_raise(StandardError, 'Error!')
+          expect(Sidekiq.logger).to receive(:error).with(
+            message: 'Failed to call sidekiq_interruption_exhausted',
+            class: 'Bob',
+            jid: nil,
+            exception: {
+              class: 'StandardError',
+              message: 'Error!'
+            }
+          )
+
+          uow = described_class::UnitOfWork
+          interrupted_job = Sidekiq.dump_json(class: 'Bob', args: [1, 2, 'foo'], interrupted_count: 3)
+          jobs = [ uow.new('queue:foo', interrupted_job), uow.new('queue:foo', job), uow.new('queue:bar', job)]
+          described_class.new(capsule).bulk_requeue(jobs)
+
+          expect(queue1.size).to eq 1
+          expect(queue2.size).to eq 1
+          expect(Sidekiq::InterruptedSet.new.size).to eq 1
+        end
+      end
+
+      context 'when interrupted_count is less than max_retries_after_interruption' do
+        it 'does not call sidekiq_interruption_exhausted callback' do
+          expect(Bob).not_to receive(:handle_interruptions_exhausted)
+
+          uow = described_class::UnitOfWork
+          interrupted_job = Sidekiq.dump_json(class: 'Bob', args: [1, 2, 'foo'], interrupted_count: 1)
+          jobs = [ uow.new('queue:foo', interrupted_job), uow.new('queue:foo', job), uow.new('queue:bar', job)]
+          described_class.new(capsule).bulk_requeue(jobs)
+
+          expect(queue1.size).to eq 2
+          expect(queue2.size).to eq 1
+          expect(Sidekiq::InterruptedSet.new.size).to eq 0
+        end
+      end
     end
 
     context 'when max_retries_after_interruption is disabled' do
@@ -108,6 +182,43 @@ describe Sidekiq::BaseReliableFetch do
       expect(queue1.size).to eq 2
       expect(queue2.size).to eq 1
       expect(Sidekiq::InterruptedSet.new.size).to eq 0
+    end
+  end
+
+  describe '#queues_cmd' do
+    let(:queues) { %w[foo bar baz] }
+
+    context 'when strictly ordered queues are enabled' do
+      before do
+        config.queues = queues
+        config[:strict] = true
+      end
+
+      it 'returns queues in order' do
+        fetcher = described_class.new(capsule)
+        expect(fetcher.queues_cmd).to eq(queues.map { |q| "queue:#{q}" })
+      end
+    end
+
+    context 'when strictly ordered queues are disabled' do
+      let(:queues) { %w[foo foo bar bar baz] }
+
+      before do
+        config.queues = queues
+        config[:strict] = false
+      end
+
+      it 'returns a shuffled and unique list of queues' do
+        fetcher = described_class.new(capsule)
+
+        # Verify the result is not in original order (shuffle was called)
+        expect(fetcher.queues).to receive(:shuffle).and_call_original
+
+        result = fetcher.queues_cmd
+
+        # Verify the result has no duplicates (uniq! was called)
+        expect(result.sort).to eq(queues.uniq.map { |q| "queue:#{q}" }.sort)
+      end
     end
   end
 

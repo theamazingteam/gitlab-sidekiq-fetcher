@@ -125,8 +125,10 @@ module Sidekiq
       @cleanup_interval = config.fetch(:cleanup_interval, DEFAULT_CLEANUP_INTERVAL)
       @lease_interval = config.fetch(:lease_interval, DEFAULT_LEASE_INTERVAL)
       @last_try_to_take_lease_at = 0
-      @strictly_ordered_queues = !!config[:strict]
+      # If the config has a :strict key, use that value. Otherwise, should respect capsule mode
+      @strictly_ordered_queues = config.has_key?(:strict) ? !!config[:strict] : capsule.mode == :strict
       @queues = config.queues.map { |q| "queue:#{q}" }
+      @queues.uniq! if @strictly_ordered_queues
     end
 
     def retrieve_work
@@ -154,6 +156,23 @@ module Sidekiq
       end
     rescue => e
       Sidekiq.logger.warn("Failed to requeue #{inprogress.size} jobs: #{e.message}")
+    end
+
+    # This method was copied from https://github.com/sidekiq/sidekiq/blob/v8.0.1/lib/sidekiq/fetch.rb#L73-L86
+    #
+    # Creating the Redis#brpop command takes into account any
+    # configured queue weights. By default Redis#brpop returns
+    # data from the first queue that has pending elements. We
+    # recreate the queue command each time we invoke Redis#brpop
+    # to honor weights and avoid queue starvation.
+    def queues_cmd
+      if @strictly_ordered_queues
+        @queues
+      else
+        permute = @queues.shuffle
+        permute.uniq!
+        permute
+      end
     end
 
     private
@@ -246,6 +265,23 @@ module Sidekiq
         jid: msg['jid'],
         message: %(Reliable Fetcher: adding dead #{msg['class']} job #{msg['jid']} to interrupted queue)
       )
+
+      begin
+        job_class = Object.const_get(msg['class'])
+        if job_class.respond_to?(:sidekiq_interruptions_exhausted)
+          job_class.interruptions_exhausted_block.call(msg)
+        end
+      rescue => e
+        Sidekiq.logger.error(
+          message: 'Failed to call sidekiq_interruption_exhausted',
+          class: msg['class'],
+          jid: msg['jid'],
+          exception: {
+            class: e.class.name,
+            message: e.message
+          }
+        )
+      end
 
       job = Sidekiq.dump_json(msg)
       @interrupted_set.put(job, connection: multi_connection)
