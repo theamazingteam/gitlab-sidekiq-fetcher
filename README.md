@@ -67,6 +67,9 @@ Sidekiq.configure_server do |config|
 end
 ```
 
+The atomic reliable fetch strategy scans each configured queue without blocking.
+After a complete scan finds no work, it waits one second before polling again.
+
 There is an additional parameter `config[:semi_reliable_fetch]` you can use to switch between two strategies:
 
 ```ruby

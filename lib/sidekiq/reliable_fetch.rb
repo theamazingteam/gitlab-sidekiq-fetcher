@@ -4,7 +4,7 @@ module Sidekiq
   class ReliableFetch < BaseReliableFetch
     # For reliable fetch we don't use Redis' blocking operations so
     # we inject a regular sleep into the loop.
-    RELIABLE_FETCH_IDLE_TIMEOUT = 5 # seconds
+    RELIABLE_FETCH_IDLE_TIMEOUT = 1 # second
 
     private
 
