@@ -11,7 +11,9 @@ module Sidekiq
     def retrieve_unit_of_work
       queues_cmd.each do |queue|
         work = Sidekiq.redis do |conn|
-          conn.rpoplpush(queue, self.class.working_queue_name(queue))
+          # LMOVE RIGHT LEFT is RPOPLPUSH's replacement; Sidekiq's Redis
+          # adapter warns on every deprecated RPOPLPUSH call.
+          conn.lmove(queue, self.class.working_queue_name(queue), "RIGHT", "LEFT")
         end
 
         return UnitOfWork.new(queue, work) if work
